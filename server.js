@@ -20,6 +20,7 @@ connection.connect((err) => {
   afterConnections();
 });
 
+//creates the welcome screen
 afterConnections = () => {
   console.log("\n" + "=".repeat(62) + "\n");
   ascii.create("    Employee", "Doom", (err, result) => {
@@ -33,6 +34,8 @@ afterConnections = () => {
     });
   });
 };
+
+//prompts user for: view all departments, view all roles, view all employees, add a department, add a role, add an employee, and update an employee role
 var promptUser = () => {
   inquirer
     .prompt([
@@ -47,6 +50,7 @@ var promptUser = () => {
           "Add a department",
           "Add a role",
           "Add an employee",
+          "Update employee role",
           "No Action",
         ],
       },
@@ -78,12 +82,17 @@ var promptUser = () => {
         addEmployee();
       }
 
+      if (choices === "Update employee role") {
+        updateEmployee();
+      }
+
       if (choices === "No Action") {
         connection.end();
       }
     });
 };
 
+//view all departments will present user with a formated table showing department names and ids
 showDepartments = () => {
   console.log("Showing departments...\n");
   const sql = `SELECT department.id AS id, department.name AS department FROM department`;
@@ -95,7 +104,7 @@ showDepartments = () => {
   });
 };
 
-// function to show all roles
+// view all roles will present table with the job title, role id, the department that role belongs to, and the salary for that role
 showRoles = () => {
   console.log("Showing all roles...\n");
 
@@ -110,7 +119,8 @@ showRoles = () => {
   });
 };
 
-// function to show all employees
+// view all employees will present table with employee data, including employee ids, first names, last names, job titles, departments,
+//salaries, and managers that the employees report to
 showEmployees = () => {
   console.log("Showing all employees...\n");
   const sql = `SELECT employee.id, 
@@ -132,7 +142,7 @@ showEmployees = () => {
   });
 };
 
-// function to add a department
+// add a department will prompt to enter the name of the department and that department is added to the database
 addDepartment = () => {
   inquirer
     .prompt([
@@ -162,7 +172,7 @@ addDepartment = () => {
     });
 };
 
-// function to add a role
+// add a role will prompt to enter the name, salary, and department for the role and that role is added to the database
 addRole = () => {
   inquirer
     .prompt([
@@ -233,7 +243,7 @@ addRole = () => {
     });
 };
 
-// function to add an employee
+//add an employee will prompt to enter the employee’s first name, last name, role, and manager, and that employee is added to the database
 addEmployee = () => {
   inquirer
     .prompt([
@@ -327,4 +337,74 @@ addEmployee = () => {
           });
       });
     });
+};
+
+//update employee will prompt to select an employee to update and their new role and this information is updated in the database
+updateEmployee = () => {
+  // get employees from employee table
+  const employeeSql = `SELECT * FROM employee`;
+
+  connection.query(employeeSql, (err, data) => {
+    if (err) throw err;
+
+    const employees = data.map(({ id, first_name, last_name }) => ({
+      name: first_name + " " + last_name,
+      value: id,
+    }));
+
+    inquirer
+      .prompt([
+        {
+          type: "list",
+          name: "name",
+          message: "Which employee would you like to update?",
+          choices: employees,
+        },
+      ])
+      .then((empChoice) => {
+        const employee = empChoice.name;
+        const params = [];
+        params.push(employee);
+
+        const roleSql = `SELECT * FROM role`;
+
+        connection.query(roleSql, (err, data) => {
+          if (err) throw err;
+
+          const roles = data.map(({ id, title }) => ({
+            name: title,
+            value: id,
+          }));
+
+          inquirer
+            .prompt([
+              {
+                type: "list",
+                name: "role",
+                message: "What is the employee's new role?",
+                choices: roles,
+              },
+            ])
+            .then((roleChoice) => {
+              const role = roleChoice.role;
+              params.push(role);
+
+              let employee = params[0];
+              params[0] = role;
+              params[1] = employee;
+
+              // console.log(params)
+
+              const sql = `UPDATE employee SET role_id = ? WHERE id = ?`;
+
+              connection.query(sql, params, (err, result) => {
+                if (err) throw err;
+                console.log("Employee has been updated!");
+
+                showEmployees();
+              });
+            });
+        });
+      });
+  });
 };
